@@ -1,0 +1,185 @@
+#!/cvmfs/software.physik.uni-bonn.de/common/anaconda/2020.11-py38/bin/python3
+import subprocess, json, argparse, os
+
+# parse flags
+parser = argparse.ArgumentParser(description='''Fetches the json output of condor_q and presents it in a nice way.''')
+parser.add_argument('--version', action='version', version='%(prog)s 2.0, 14 Apr 2023 by Marvin Lenk')
+parser.add_argument("-u", "--user", help="Submitter user name, e.g. s6mxmust")
+parser.add_argument("-hn", "--hostname", help="Submitting host name, e.g. theo123")
+parser.add_argument("-hi", "--history", action='store_true', help="Look through history instead of queue")
+
+args = parser.parse_args()
+
+try:
+  username = os.environ["USER"]
+except:
+  username = os.environ["USERNAME"]
+
+# fill string with free spaces and add delimiter
+def filltab(strin, lstr=13, delim="| "):
+  if len(strin) < lstr:
+    strout = strin + " " * (lstr - len(strin)) + delim
+  else:
+    strout = strin + delim
+
+  return strout
+
+# list of fields wanted from condor_q with their appropriate names
+fields = {
+  "gId" : "GlobalJobId",
+  "cId" : "ClusterId",
+  "pId" : "ProcId",
+  "st" : "JobStatus",
+  "rhost" : "RemoteHost",
+  "lrhost" : "LastRemoteHost",
+  "cpus" : "RequestCpus",
+  "tmax" : "MaxRuntimeHours",
+  "tnow" : "ServerTime",
+#  "tstart" : "JobCurrentStartDate",
+  "tstart" : "EnteredCurrentStatus",
+  "rwct" : "RemoteWallClockTime",
+  "ram" : "ResidentSetSize_RAW",
+  "rammax" : "RequestMemory",
+  "hdd" : "DiskUsage_RAW",
+  "hddmax" : "RequestDisk",
+  "args" : "Args"
+  }
+
+# dictionary of status integer
+status = {
+  "0" : "Wait",
+  "1" : "Idle",
+  "2" : "Run",
+  "3" : "Rem",
+  "4" : "Done",
+  "5" : "Hold",
+  "6" : "Err"
+  }
+
+# flags for the condor_q call
+if args.history:
+  condor_q_call = [
+    "condor_history",
+    "-json"]
+else:
+  condor_q_call = [
+    "condor_q",
+    "-json"]
+
+# add name flag if specified
+if args.hostname is None:
+  if not args.history:
+    condor_q_call.append("--global")
+else:
+  condor_q_call.extend(["-name", args.hostname])
+
+# add submitter flag if specified or needed
+if not(args.user is None):
+  if args.history:
+    condor_q_call.extend([args.user])
+  else:
+    condor_q_call.extend(["-submitter", args.user])
+elif args.history:
+  condor_q_call.extend([username])
+
+#  "-constraint",
+#    "JobStatus==2",
+condor_q_call.extend(["-af:hj",
+    fields["cId"],
+    fields["pId"],
+    fields["gId"],
+    fields["st"],
+    fields["cpus"],
+    fields["tmax"],
+    fields["tnow"],
+    fields["tstart"],
+    fields["rwct"],
+    fields["ram"],
+    fields["rammax"],
+    fields["hdd"],
+    fields["hddmax"],
+    fields["args"]
+  ])
+
+if args.history:
+  condor_q_call.extend([fields["lrhost"]])
+else:
+  condor_q_call.extend([fields["rhost"]])
+
+# call and read out condor_q_call
+condor_q = subprocess.Popen(condor_q_call, stdout=subprocess.PIPE, text=True)
+condor_q_str = condor_q.communicate()[0]
+if condor_q.poll():
+  raise Exception(condor_q.errors)
+
+# exit if no jobs are present
+if len(condor_q_str) < 10:
+  exit(0)
+
+# convert json to array of dictionaries
+qjson = json.loads(condor_q_str)
+
+# draw headline of output
+print(filltab("Host", lstr=8), end="")
+print(filltab("Cl-ID", lstr=9), end="")
+print(filltab("RHost", lstr=6), end="")
+print(filltab("CPUs", lstr=5), end="")
+print(filltab("W-time/h"), end="")
+print(filltab("RAM/GB"), end="")
+print(filltab("Quota/GB"), end="")
+print(filltab("Status", lstr=6), end="")
+print(filltab("Args", delim="", lstr=12))
+
+# iterate through jobs and print details
+for el in qjson:
+  gId = str(el[fields["gId"]])
+  idot = gId.find(".")
+  print(filltab(gId[0:idot], lstr=8), end="")
+  print(filltab(str(el[fields["cId"]]) + "." + str(el[fields["pId"]]), lstr=9), end="")
+  
+  # For history we need the last rhost
+  if args.history:
+    rhost_h = el[fields["lrhost"]]
+  else:
+    rhost_h = el[fields["rhost"]]
+    
+  try:
+    rhost = str(rhost_h)
+  except:
+    print(filltab("-", lstr=6), end="")
+  else:
+    iat = rhost.find("@")
+    print(filltab(rhost[iat+1:iat+6], lstr=6), end="")
+
+  print(filltab(" " + str(el[fields["cpus"]]), lstr=5), end="")
+  if el[fields["st"]] == 2:
+    try:
+      wtime = round( ( el[fields["tnow"]] - el[fields["tstart"]] ) / (60.0 * 60.0) , 1)
+    except:
+      wtime = 0.0
+  else:
+    wtime = 0.0
+
+  wtime_max = round( float(el[fields["tmax"]]) - (el[fields["rwct"]] / (60.0 * 60.0) ) ,1)
+  print( filltab(str(wtime) + " / " + str(wtime_max)), end="" )
+  try:
+    ram = round( (el[fields["ram"]] + 1023) / (1024.0 * 1024.0) , 1)
+  except:
+    ram = 0.0
+    quota = 0.0
+  else:
+    quota = round( (el[fields["hdd"]] + 1023) / (1024.0 * 1024.0) , 1)
+
+  rammax = el[fields["rammax"]] / 1024
+  print( filltab(str(ram) + " / " + str(rammax)), end="" )
+  quotamax = el[fields["hddmax"]] / (1024 * 1024)
+  print( filltab(str(quota) + " / " + str(quotamax)), end="" )
+  print( filltab( status[str(el[fields["st"]])], lstr=6 ), end="" )
+  try:
+    qargs = el[fields["args"]]
+  except:
+    qargs = ""
+  
+  print( filltab(qargs , delim="", lstr=12 ) )
+exit(0)
+# end
