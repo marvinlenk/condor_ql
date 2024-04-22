@@ -138,12 +138,12 @@ for el in qjson:
   print(filltab(str(el[fields["cId"]]) + "." + str(el[fields["pId"]]), lstr=9), end="")
   
   # For history we need the last rhost
-  if args.history:
-    rhost_h = el[fields["lrhost"]]
-  else:
-    rhost_h = el[fields["rhost"]]
-    
   try:
+    if args.history:
+      rhost_h = el[fields["lrhost"]]
+    else:
+      rhost_h = el[fields["rhost"]]
+    
     rhost = str(rhost_h)
   except:
     print(filltab("-", lstr=6), end="")
