@@ -1,5 +1,6 @@
 #!/cvmfs/software.physik.uni-bonn.de/common/anaconda/2020.11-py38/bin/python3
 import subprocess, json, argparse, os
+from datetime import datetime
 
 # parse flags
 parser = argparse.ArgumentParser(description='''Fetches the json output of condor_q and presents it in a nice way.''')
@@ -35,9 +36,11 @@ fields = {
   "cpus" : "RequestCpus",
   "tmax" : "MaxRuntimeHours",
   "tnow" : "ServerTime",
-#  "tstart" : "JobCurrentStartDate",
-  "tstart" : "EnteredCurrentStatus",
-  "rwct" : "RemoteWallClockTime",
+  "trwc" : "RemoteWallClockTime",
+  "tsubmit" : "QDate",
+  "tstat" : "EnteredCurentStatus",
+  "tstart" : "JobCurrentStartDate",
+  "tend" : "JobFinishedHookDone",
   "ram" : "ResidentSetSize_RAW",
   "rammax" : "RequestMemory",
   "hdd" : "DiskUsage_RAW",
@@ -93,7 +96,6 @@ condor_q_call.extend(["-af:hj",
     fields["tmax"],
     fields["tnow"],
     fields["tstart"],
-    fields["rwct"],
     fields["ram"],
     fields["rammax"],
     fields["hdd"],
@@ -102,9 +104,12 @@ condor_q_call.extend(["-af:hj",
   ])
 
 if args.history:
-  condor_q_call.extend([fields["lrhost"]])
+  condor_q_call.extend([fields["lrhost"],
+                        fields["tend"],
+                        fields["tsubmit"]])
 else:
-  condor_q_call.extend([fields["rhost"]])
+  condor_q_call.extend([fields["rhost"],
+                        fields["trwc"]])
 
 # call and read out condor_q_call
 condor_q = subprocess.Popen(condor_q_call, stdout=subprocess.PIPE, text=True)
@@ -123,11 +128,17 @@ qjson = json.loads(condor_q_str)
 print(filltab("Host", lstr=8), end="")
 print(filltab("Cl-ID", lstr=9), end="")
 print(filltab("RHost", lstr=6), end="")
-print(filltab("CPUs", lstr=5), end="")
-print(filltab("W-time/h"), end="")
+print(filltab("CPUs", lstr=3), end="")
+if args.history:
+  print(filltab("Submitted", lstr=15), end="")
+  print(filltab("Started", lstr=15), end="")
+  print(filltab("Ended", lstr=15), end="")
+else:
+  print(filltab("W-time/h"), end="")
+
 print(filltab("RAM/GB"), end="")
 print(filltab("Quota/GB"), end="")
-print(filltab("Status", lstr=6), end="")
+print(filltab("Stat", lstr=6), end="")
 print(filltab("Args", delim="", lstr=12))
 
 # iterate through jobs and print details
@@ -150,18 +161,33 @@ for el in qjson:
   else:
     iat = rhost.find("@")
     print(filltab(rhost[iat+1:iat+6], lstr=6), end="")
-
-  print(filltab(" " + str(el[fields["cpus"]]), lstr=5), end="")
-  if el[fields["st"]] == 2:
-    try:
-      wtime = round( ( el[fields["tnow"]] - el[fields["tstart"]] ) / (60.0 * 60.0) , 1)
-    except:
-      wtime = 0.0
+  
+  print(filltab(str(el[fields["cpus"]]), lstr=4), end="")
+  
+  if args.history:
+    # submit time without seconds
+    submittime = datetime.fromtimestamp(el[fields["tsubmit"]]).strftime("%x %X")[:-3]
+    print(filltab(submittime, lstr=15), end="")
+    
+    # start time without seconds
+    starttime = datetime.fromtimestamp(el[fields["tstart"]]).strftime("%x %X")[:-3]
+    print(filltab(starttime, lstr=15), end="")
+    
+    # end time without seconds
+    endtime = datetime.fromtimestamp(el[fields["tend"]]).strftime("%x %X")[:-3]
+    print(filltab(endtime, lstr=15), end="")
   else:
-    wtime = 0.0
+    if el[fields["st"]] == 2:
+      try:
+        wtime = round( ( el[fields["tnow"]] - el[fields["tstart"]] ) / (60.0 * 60.0) , 1)
+      except:
+        wtime = 0.0
+    else:
+      wtime = 0.0
 
-  wtime_max = round( float(el[fields["tmax"]]) - (el[fields["rwct"]] / (60.0 * 60.0) ) ,1)
-  print( filltab(str(wtime) + " / " + str(wtime_max)), end="" )
+    wtime_max = round( float(el[fields["tmax"]]) - (el[fields["trwc"]] / (60.0 * 60.0) ) ,1)
+    print( filltab(str(wtime) + " / " + str(wtime_max)), end="" )
+    
   try:
     ram = round( (el[fields["ram"]] + 1023) / (1024.0 * 1024.0) , 1)
   except:
