@@ -4,8 +4,14 @@ A Uni-Bonn BAF2-Cluster HTCondor `condor_q` and `condor_history` parser for Pyth
 Takes the `condor_q` or `condor_history` output (with a specific query) in JSON form and parses it to a nicer and cleaner output.
 Options are explained by `condor_ql --help`
 
+Example output of `condor_ql`:
+![condor_ql_output](https://github.com/marvinlenk/condor_ql/assets/25794829/9dac37ae-32fe-437f-aa11-87bc9d35953c)
+
+Example output of `condor_ql -hi`
+![condor_ql_hi_output](https://github.com/marvinlenk/condor_ql/assets/25794829/c47480f5-2762-454d-b6a3-d82ec5751397)
+
 How to get it working on your system:
-1. Copy the `condor_ql` file into a folder of choice (e.g. `~/.local/bin`) OR clone the repo and create a symlink to `condor_ql` in the desired folder.
+1. Copy the `condor_ql` file into a folder of choice (e.g. `~/.local/bin`) OR clone the repo and create a [symlink](https://stackoverflow.com/a/1951752) to `condor_ql` in the desired folder.
 
 2. Make shure the path to `condor_ql` (or the symlink) is in your `$PATH` variable - if not do the following:
   Change your terminal profile to include the path, e.g. add 
@@ -26,3 +32,5 @@ How to get it working on your system:
 
 Tada! Now it should work.
 Please note, that the command can be slow, just as `condor_q` and especially `condor_history` is.
+
+P.S. This script is not officially supported by the Uni Bonn IT team. You are free to use it, but please don't contact them for support. 
