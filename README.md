@@ -7,7 +7,7 @@ Options are explained by `condor_ql --help`
 Example output of `condor_ql`:
 ![condor_ql_output](https://github.com/marvinlenk/condor_ql/assets/25794829/9dac37ae-32fe-437f-aa11-87bc9d35953c)
 
-Example output of `condor_ql -hi`
+Example output of `condor_ql -hi`:
 ![condor_ql_hi_output](https://github.com/marvinlenk/condor_ql/assets/25794829/c47480f5-2762-454d-b6a3-d82ec5751397)
 
 How to get it working on your system:
