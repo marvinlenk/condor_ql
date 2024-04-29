@@ -20,13 +20,10 @@ How to get it working on your system:
   `~/.bash_profile`
   file (create one if it doesn't exist)
   
-3. (OPTIONAL / might not be necessary on your system) Change the path after #! to your Python3.X in the `condor_ql` file. If you are not sure where your Python sits, use:
-  `which python3`
-  You may have to plug in the command you use to open Python, but make sure it is version 3.0 or newer !!!
+3. (**OPTIONAL** / might not be necessary on your system) Change the path after `#!` in the `condor_ql` file to your Python3.X path. If you are not sure where your Python sits, use
+  `which python3`. Please note that Python2 is not supported and likely will not work in this case.
 
-4. Make it executable via executing
-  `chmod +x condor_ql`
-  in the folder where `condor_ql` (or the symlink) resides.
+4. Make it executable via executing `chmod +x condor_ql` in the folder where the file `condor_ql` (or the symlink) resides.
 
 5. You might want to restart the terminal session for bash to recognize the new command.
 
