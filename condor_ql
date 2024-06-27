@@ -171,7 +171,11 @@ for el in qjson:
     print(filltab(submittime, lstr=15), end="")
     
     # start time without seconds
-    starttime = datetime.fromtimestamp(el[fields["tstart"]]).strftime("%x %X")[:-3]
+    try:
+      starttime = datetime.fromtimestamp(el[fields["tstart"]]).strftime("%x %X")[:-3]
+    except:
+      starttime = "-"
+    
     print(filltab(starttime, lstr=15), end="")
     
     # end time without seconds
