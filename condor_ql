@@ -118,13 +118,6 @@ condor_q_str = condor_q.communicate()[0]
 if condor_q.poll():
   raise Exception(condor_q.errors)
 
-# exit if no jobs are present
-if len(condor_q_str) < 10:
-  exit(0)
-
-# convert json to array of dictionaries
-qjson = json.loads(condor_q_str)
-
 # draw headline of output
 print(filltab("Host", lstr=8), end="")
 print(filltab("Cl-ID", lstr=9), end="")
@@ -141,6 +134,13 @@ print(filltab("RAM/GB"), end="")
 print(filltab("Quota/GB"), end="")
 print(filltab("Stat", lstr=5), end="")
 print(filltab("Args", delim="", lstr=12))
+
+# exit if no jobs are present
+if len(condor_q_str) < 10:
+  exit(0)
+
+# convert json to array of dictionaries
+qjson = json.loads(condor_q_str)
 
 # iterate through jobs and print details
 for el in qjson:
