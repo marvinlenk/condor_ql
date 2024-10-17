@@ -1,4 +1,4 @@
-#!/cvmfs/software.physik.uni-bonn.de/common/anaconda/2020.11-py38/bin/python3
+#!/cvmfs/software.physik.uni-bonn.de/common/miniforge/24.7.1-0-py312/bin/python3
 import subprocess, json, argparse, os
 from datetime import datetime
 
