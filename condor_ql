@@ -4,8 +4,9 @@ from datetime import datetime
 
 # parse flags
 parser = argparse.ArgumentParser(description='''Fetches the json output of condor_q and presents it in a nice way.''')
-parser.add_argument('--version', action='version', version='%(prog)s 2.0, 14 Apr 2023 by Marvin Lenk')
+parser.add_argument('--version', action='version', version='%(prog)s 2.1, 23 May 2025 by Marvin Lenk')
 parser.add_argument("-u", "--user", help="Submitter user name, e.g. s6mxmust")
+parser.add_argument("-s", "--status", help="Current status, 0=Wait, 1=Idle, 2=Run, 3=Rem, 4=Done, 5=Hold, 6=Err, 7=Susp")
 parser.add_argument("-hn", "--hostname", help="Submitting host name, e.g. theo123")
 parser.add_argument("-hi", "--history", action='store_true', help="Look through history instead of queue")
 
@@ -85,6 +86,10 @@ if not(args.user is None):
     condor_q_call.extend(["-submitter", args.user])
 elif args.history:
   condor_q_call.extend([username])
+
+# add status flag if specified
+if not(args.status is None):
+    condor_q_call.extend(["-constraint", "JobStatus=={0}".format(args.status)])
 
 #  "-constraint",
 #    "JobStatus==2",
