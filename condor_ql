@@ -208,7 +208,12 @@ for el in qjson:
 
   rammax = el[fields["rammax"]] / 1024
   print( filltab(str(ram) + " / " + str(rammax)), end="" )
-  quotamax = el[fields["hddmax"]] / (1024 * 1024)
+
+  try:
+    quotamax = el[fields["hddmax"]] / (1024 * 1024)
+  except:
+    quotamax = el[fields["hddmax"]]
+
   print( filltab(str(quota) + " / " + str(quotamax)), end="" )
   try:
     st_str = status[str(el[fields["st"]])]
