@@ -1,14 +1,16 @@
 #!/cvmfs/software.physik.uni-bonn.de/common/miniforge/24.7.1-0-py312/bin/python3
-import subprocess, json, argparse, os
+import subprocess, json, argparse, os, atexit
 from datetime import datetime
 
 # parse flags
 parser = argparse.ArgumentParser(description='''Fetches the json output of condor_q and presents it in a nice way.''')
-parser.add_argument('--version', action='version', version='%(prog)s 2.1, 23 May 2025 by Marvin Lenk')
+parser.add_argument('--version', action='version', version='%(prog)s 2.1, 23 May 2025 by Marvin Lenk; -b batch view and -p by Sagnik Ghosh')
 parser.add_argument("-u", "--user", help="Submitter user name, e.g. s6mxmust")
 parser.add_argument("-s", "--status", help="Current status, 0=Wait, 1=Idle, 2=Run, 3=Rem, 4=Done, 5=Hold, 6=Err, 7=Susp")
 parser.add_argument("-hn", "--hostname", help="Submitting host name, e.g. theo123")
 parser.add_argument("-hi", "--history", action='store_true', help="Look through history instead of queue")
+parser.add_argument("-b", "--batch", action='store_true', help="One line per batch (JobBatchName) across all schedds instead of one line per job")
+parser.add_argument("-p", "--prio", action='store_true', help="Also print condor_userprio below the output")
 
 args = parser.parse_args()
 
@@ -60,6 +62,56 @@ status = {
   "6" : "Err",
   "7" : "Susp"
   }
+
+# ---- batch view (-b) and condor_userprio (-p) ----
+def run(cmd):
+  p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+  return p.stdout if p.returncode == 0 else ""
+
+# -p: condor_userprio below whatever is printed, also after an early exit
+if args.prio:
+  atexit.register(lambda: print("\n" + (run(["condor_userprio"]) or "condor_userprio: no output")))
+
+def batch_view():
+  user = args.user or username
+  call = ["condor_q", "-json", "--global", "-submitter", user, "-af:hj",
+          "ClusterId", "ProcId", "GlobalJobId", "JobStatus", "JobBatchName", "QDate", "TotalSubmitProcs",
+          "JobCurrentStartDate", "ServerTime", "ResidentSetSize_RAW", "RequestMemory", "RequestCpus"]
+  out = run(call)
+  jobs = json.loads(out) if len(out) > 10 else []
+  B = {}
+  for j in jobs:
+    schedd = str(j.get("GlobalJobId", "?")).split("#")[0].split(".")[0]   # theo199, exp199, ...
+    name = (schedd, j.get("JobBatchName") or "ID: %s" % j["ClusterId"])
+    b = B.setdefault(name, {"clusters": {}, "st": {}, "q": j.get("QDate", 0), "wmax": 0.0, "ram": 0.0, "req": 0.0, "cpus": j.get("RequestCpus", 1)})
+    b["clusters"].setdefault(j["ClusterId"], j.get("TotalSubmitProcs") or 0)
+    st = j.get("JobStatus", 0); b["st"][st] = b["st"].get(st, 0) + 1
+    b["q"] = min(b["q"], j.get("QDate", b["q"]))
+    if st == 2 and j.get("JobCurrentStartDate"):
+      b["wmax"] = max(b["wmax"], (j.get("ServerTime", 0) - j["JobCurrentStartDate"]) / 3600.0)
+    if j.get("ResidentSetSize_RAW"): b["ram"] = max(b["ram"], j["ResidentSetSize_RAW"] / 1024.0 / 1024.0)
+    if j.get("RequestMemory"): b["req"] = max(b["req"], j["RequestMemory"] / 1024.0)
+  now = datetime.now().strftime("%d.%m. %H:%M")
+  print("%s   batches of %s across the cluster   %s" % ("condor_ql -b", user, now))
+  head = "%-8s %-46s %-11s %7s %7s %7s %6s %7s  %-22s %8s %11s" % ("SCHEDD", "BATCH", "SUBMITTED", "DONE", "RUN", "IDLE", "HOLD", "TOTAL", "PROGRESS", "MAX W/h", "RAM/REQ GB")
+  print(head); print("-" * len(head))
+  tot = {"d": 0, "r": 0, "i": 0, "h": 0, "t": 0}
+  for name, b in sorted(B.items(), key=lambda x: x[1]["q"]):
+    run_, idle, hold = b["st"].get(2, 0), b["st"].get(1, 0), b["st"].get(5, 0)
+    total = sum(b["clusters"].values()) or sum(b["st"].values())
+    done = max(total - sum(b["st"].values()), 0)
+    frac = done / total if total else 0.0
+    bar = "#" * int(round(20 * frac)) + "." * (20 - int(round(20 * frac)))
+    sub = datetime.fromtimestamp(b["q"]).strftime("%d.%m %H:%M") if b["q"] else "-"
+    nm = name[1] if len(name[1]) <= 46 else name[1][:43] + "..."
+    print("%-8s %-46s %-11s %7d %7d %7d %6d %7d  %s %3d%% %6.1f %11s" % (name[0], nm, sub, done, run_, idle, hold, total, bar, round(100 * frac), b["wmax"], "%.1f/%.0f" % (b["ram"], b["req"])))
+    for k, v in (("d", done), ("r", run_), ("i", idle), ("h", hold), ("t", total)): tot[k] += v
+  print("-" * len(head))
+  print("%-8s %-46s %-11s %7d %7d %7d %6d %7d  %d batches" % ("", "total", "", tot["d"], tot["r"], tot["i"], tot["h"], tot["t"], len(B)))
+
+if args.batch and not args.history:
+  batch_view()
+  exit(0)
 
 # flags for the condor_q call
 if args.history:
